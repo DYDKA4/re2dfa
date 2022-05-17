@@ -32,8 +32,8 @@ void up_build_tree(tree_node *t,std::vector<std::set<int>> &table_follow)
 {
     if (t == nullptr) return;
 
-    up_build_tree(t->left,table_follow);//С помощью рекурсивного посещаем левое поддерево
     up_build_tree(t->right,table_follow); //С помощью рекурсии посещаем правое поддерево
+    up_build_tree(t->left,table_follow);//С помощью рекурсивного посещаем левое поддерево
     auto left = t->left;
     auto right = t->right;
     if(t->symbol == '|'){
@@ -50,7 +50,7 @@ void up_build_tree(tree_node *t,std::vector<std::set<int>> &table_follow)
         }
         t->last_poz = right->last_poz;
         if(right->nullable){
-            t->last_poz.insert(left->first_poz.begin(),left->first_poz.end());
+            t->last_poz.insert(left->last_poz.begin(),left->last_poz.end());
         }
         for(int it:left->last_poz){
             if(it > 0)
@@ -72,7 +72,21 @@ void up_build_tree(tree_node *t,std::vector<std::set<int>> &table_follow)
         std::cout << i << ' ';
     std::cout << '\n';
 }
-
+void print_tree(tree_node *t){
+    if(t== nullptr)
+        return;
+    std::cout<<t->symbol<< " ";
+    std::cout<<"nullable: "<<t->nullable;
+    std::cout<<" firstpos: ";
+    for(auto i : t->first_poz)
+        std::cout << i << ' ';
+    std::cout<<" lastpos: ";
+    for(auto i : t->last_poz)
+        std::cout << i << ' ';
+    std::cout <<'\n';
+    print_tree(t->right);
+    print_tree(t->left);
+}
 std::string replace_str(std::string str,const std::string& find, const std::string& change){
     size_t index = 0;
     while (true) {
@@ -146,13 +160,17 @@ DFA re2dfa(const std::string &s) {
     }
     std::cout<<new_string <<"\n";
     new_string = replace_str(new_string,"(|","(@|");
+    new_string = replace_str(new_string,"()","(@)");
     new_string = replace_str(new_string,"||","|@|");
     new_string = replace_str(new_string,"|)","|@)");
+    new_string = replace_str(new_string,"|*","|@*");
     std::cout << "insert @ SUCCESS\n";
     std::cout<<new_string <<"\n";
     i=count=0;
     for (auto it = symbols.begin(); it != symbols.end(); ++it) {
-        for(auto iter=it; iter != symbols.end(); ++iter){
+        std::string s_find;
+        std::string s_replace;
+        for(auto iter=symbols.begin(); iter != symbols.end(); ++iter){
             std::string find;
             std::string replace;
             find.push_back(*it);
@@ -162,9 +180,24 @@ DFA re2dfa(const std::string &s) {
             std::cout << find << ' ' << replace << '\n';
             new_string = replace_str(new_string,find,replace);
         }
+        s_find.push_back('*');
+        s_find.push_back(*it);
+        s_replace=s_find;
+        s_replace.insert(1,"&");
+        std::cout << s_find << ' ' << s_replace << '\n';
+        new_string = replace_str(new_string,s_find,s_replace);
+        s_find.clear();
+        s_find.push_back(*it);
+        s_find.push_back('(');
+        s_replace = s_find;
+        s_replace.insert(1,"&");
+        std::cout << s_find << ' ' << s_replace << '\n';
+        new_string = replace_str(new_string,s_find,s_replace);
     }
     std::cout<<new_string <<"\n";
     new_string = replace_str(new_string,")(",")&(");
+    new_string = replace_str(new_string,"*(","*&(");
+
 
     std::cout << "insert & SUCCESS\n";
     std::cout<<new_string <<"\n";
@@ -200,7 +233,7 @@ DFA re2dfa(const std::string &s) {
                     operands.push(it);
                 }
                 else if(it == '*'){
-                    operands.push(it);
+                    polish_notation.push_back(it);
                 }
                 else if(it == '&'){
                     if (operands.top()=='|'){
@@ -343,6 +376,7 @@ l:    do{
         }
         std::cout<<'\n';
     }
+//    print_tree(root);
     std::cout<<symb;
 	return res;
 }
