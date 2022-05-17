@@ -53,12 +53,13 @@ void up_build_tree(tree_node *t,std::vector<std::set<int>> &table_follow)
             t->last_poz.insert(left->first_poz.begin(),left->first_poz.end());
         }
         for(int it:left->last_poz){
-            table_follow[it-1].insert(right->first_poz.begin(),right->first_poz.end());
+            if(it > 0)
+                table_follow[it-1].insert(right->first_poz.begin(),right->first_poz.end());
         }
     } else if (t->symbol == '*'){
         t->nullable = true;
         t->first_poz = left->first_poz;
-        t->last_poz = left->first_poz;
+        t->last_poz = left->last_poz;
         for(int it:t->last_poz){
             table_follow[it-1].insert(t->first_poz.begin(),t->first_poz.end());
         }
@@ -74,17 +75,14 @@ void up_build_tree(tree_node *t,std::vector<std::set<int>> &table_follow)
 
 std::string replace_str(std::string str,const std::string& find, const std::string& change){
     size_t index = 0;
-    size_t pos = str.find(find);
-        if (pos != std::string::npos)
-            return str;
     while (true) {
         /* Locate the substring to replace. */
         index = str.find(find, index);
         if (index == std::string::npos) break;
         /* Make the replacement. */
-        str.replace(index, change.size(), change);
+        str.replace(index, find.size(), change);
         /* Advance index forward so the next iteration doesn't pick it up as well. */
-        index += 3;
+        index += change.size();
     }
     return str;
 }
@@ -146,59 +144,30 @@ DFA re2dfa(const std::string &s) {
     if(*(new_string.end()-1)=='|'){
         new_string.push_back('@');
     }
-
+    std::cout<<new_string <<"\n";
     new_string = replace_str(new_string,"(|","(@|");
     new_string = replace_str(new_string,"||","|@|");
     new_string = replace_str(new_string,"|)","|@)");
     std::cout << "insert @ SUCCESS\n";
-//    new_string = replace_str(new_string,"|)","|@)");
-
-//    new_string = std::regex_replace(new_string, std::regex("||"), "|@|");
-    //    for (auto it = new_string.begin(); it != new_string.end() - 1; ++it){
-//        bool first = symbols.find(*it) != symbols.end();
-//        bool second = symbols.find(*(it+1)) != symbols.end();
-////        std::cout << (!(first || second)) << "\n";
-//        if ((it == new_string.begin()) && !first && *it!='('){
-//            insert_eps_poz.push_back(-1);
-//            count++;
-//        }
-//        if (!(first || second) && *it != '*' && *(it+1) != '*' &&(*it!=')'&&*(it+1)!='('))  {
-//            insert_eps_poz.push_back(i+count);
-//            count++;
-//        }
-//        if((it+1 == new_string.end()-1&&!second) && *(it+1) != '*'){
-//            insert_eps_poz.push_back(i+count+1);
-//        }
-//        i++;
-//    }
-//    for(int it:insert_eps_poz){
-//        new_string.insert(it+1,"@");
-////        std::cout<<it<< "\n";
-//    }
+    std::cout<<new_string <<"\n";
     i=count=0;
+    for (auto it = symbols.begin(); it != symbols.end(); ++it) {
+        for(auto iter=it; iter != symbols.end(); ++iter){
+            std::string find;
+            std::string replace;
+            find.push_back(*it);
+            find.push_back(*iter);
+            replace = find;
+            replace.insert(1,"&");
+            std::cout << find << ' ' << replace << '\n';
+            new_string = replace_str(new_string,find,replace);
+        }
+    }
+    std::cout<<new_string <<"\n";
+    new_string = replace_str(new_string,")(",")&(");
 
-    for (auto it = new_string.begin(); it != new_string.end() - 1; ++it){
-        bool first = symbols.find(*it) != symbols.end();
-        bool second = symbols.find(*(it+1)) != symbols.end();
-        if(first and second){
-            insert_mul_poz.push_back(i+count);
-            count++;
-        }
-//        if(!first && !second  && (*it==')' && *(it+1)=='(')){
-//            insert_mul_poz.push_back(i+count);
-//            count++;
-//        }
-        if(second and *it=='*'){
-            insert_mul_poz.push_back(i+count);
-            count++;
-        }
-        i++;
-    }
-    for(int it:insert_mul_poz){
-        new_string.insert(it+1,"&");
-        std::cout<<it<< "\n";
-    }
-    std::cout<<"\n";
+    std::cout << "insert & SUCCESS\n";
+    std::cout<<new_string <<"\n";
     std::vector <char> poz;
     new_string.insert(0,"(");
     new_string.push_back(')');
@@ -216,6 +185,7 @@ DFA re2dfa(const std::string &s) {
     // 1 &
     // 2 *
     // 3 ()
+    std::cout << "polish BEGIN\n";
     for(char it:new_string){
         if(!bool(symbols.find(it) != symbols.end())){
             if (it == ')'){
@@ -264,12 +234,15 @@ DFA re2dfa(const std::string &s) {
         polish_notation.push_back(operands.top());
         operands.pop();
     }
+    std::cout << "polish SUCCESS\n" << polish_notation << '\n';
+
     k = polish_notation.length()-1;
     count = 0;
     for(char it:new_string) {
         if (it == '&' || it == '|' || it == '*')
             count++;
     }
+
     sym = k-count+1;
     length = sym;
     std::vector<std::set<int>>my_sets;
@@ -278,8 +251,11 @@ DFA re2dfa(const std::string &s) {
         std::set<int> sets;
         my_sets.push_back(sets);
     }
+    std::cout << "filling my_sets SUCCESS\n";
     auto* root = fill_tree(polish_notation,symbols);
+    std::cout << "filling tree SUCCESS\n";
     up_build_tree(root,my_sets);
+    std::cout << "filling full tree SUCCESS\n";
 
 
     std::cout << '\n' << root->symbol;
@@ -305,8 +281,10 @@ DFA re2dfa(const std::string &s) {
     bool is_in = condition[0].find(symb.size()) != condition[0].end();
     res.create_state("0", is_in);
     res.set_initial("0");
-    int elem=0;
-    do{
+    int elem=0,fact_elem=0;
+    bool new_cond;
+    bool last_loop = true;
+l:    do{
         condition_copy = condition;
         for(char it_2:alph){
             std::set<int>new_condition;
@@ -319,11 +297,11 @@ DFA re2dfa(const std::string &s) {
                 std::cout << iter << ' ';
             }
             //is it new?
-            bool new_cond = true;
+            new_cond = true;
             for(int l=0;l != condition.size();l++){
                 if(condition[l] == new_condition) {
                     new_cond = false;
-                    res.set_trans(std::to_string(elem),it_2,std::to_string(l));
+                    res.set_trans(std::to_string(fact_elem),it_2,std::to_string(l));
                     break;
                 }
             }
@@ -334,10 +312,11 @@ DFA re2dfa(const std::string &s) {
                     is_in = new_condition.find(symb.size()) != new_condition.end();
 //                    std::cout << "end " << () << '\n';
                     res.create_state(std::to_string(condition.size()-1), is_in);
-                    res.set_trans(std::to_string(elem),it_2,std::to_string(condition.size()-1));
+                    res.set_trans(std::to_string(fact_elem),it_2,std::to_string(condition.size()-1));
 
                 }
             }
+
 
             std::cout<<"NEW\n";
             for(auto iter:condition){
@@ -350,7 +329,13 @@ DFA re2dfa(const std::string &s) {
 
         std::cout << '\n';
         elem++;
+        fact_elem++;
     }while(condition_copy.size() != condition.size());
+    if (last_loop){
+        elem = condition.size()-1;
+        last_loop = false;
+        goto l;
+    }
     for(auto it:condition){
         std::cout << "state: ";
         for(int iter:it){
